@@ -3,13 +3,13 @@ import cors from 'cors';
 import express from 'express';
 // import cookieParser from 'cookie-parser';
 
-// import connectDB from './config/mongodb.js';
+import connectDB from './config/connectMongoDB.js';
 // import userRouter from './routes/userRouter.js';
 
 const app = express();
 const port = process.env.PORT || 1313;
 
-// connectDB();
+connectDB();
 
 app.use(express.json());
 // app.use(cookieParser());
