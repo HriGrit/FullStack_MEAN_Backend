@@ -22,6 +22,17 @@ app.use(cors({
     credentials: true // Required for cookies
 }));
 
+// Handle malformed JSON payloads explicitly to return a clean 400 error
+app.use((err, req, res, next) => {
+    if (err && err.type === 'entity.parse.failed') {
+        return res.status(400).json({
+            ok: false,
+            code: 'BAD_JSON',
+            message: 'Malformed JSON in request body'
+        });
+    }
+    return next(err);
+});
 
 app.use( '/api/v1', userRouter );
 app.use('/api/v1/admin',adminRouter);
@@ -30,7 +41,7 @@ app.use('/api/v1/doctors', doctorRouter);
 app.use('/api/v1/appointments', appointmentRouter);
 
 app.get('/', function(req, res) {
-    console.log("root"); 
+    console.log("root");
     res.json({'status':'working'});
 })
 

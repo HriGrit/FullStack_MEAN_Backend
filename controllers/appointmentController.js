@@ -1,192 +1,278 @@
 import { AppointmentModel } from '../models/appointmentModel.js';
-import { DoctorModel } from '../models/doctorModel.js';
-import { isWithinAvailability, convertDayToIndex } from '../services/availability.js';
 
-// Book appointment
-export const bookAppointment = async (req, res) => {
-  try {
-    const { patient_id, doctor_id, appointment_day } = req.body;
+const SLOT_TIMES = [
+  "10:00-11:00",
+  "11:00-12:00",
+  "12:00-13:00",
+  "13:00-14:00",
+  "14:00-15:00",
+  "15:00-16:00",
+  "16:00-17:00",
+  "17:00-18:00"
+];
 
-    if (!patient_id || !doctor_id || !appointment_day) {
-      return res.status(400).json({
-        success: false,
-        message: 'patient_id, doctor_id, and appointment_day are required'
-      });
-    }
+/**
+ * Validates date format YYYY-MM-DD
+ */
+function isValidDateFormat(dateStr) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateStr);
+}
 
-    const doctor = await DoctorModel.findById(doctor_id);
-    if (!doctor) {
-      return res.status(404).json({ success: false, message: 'Doctor not found' });
-    }
+/**
+ * Checks if date is a weekday (Monday-Friday)
+ * Returns true if Mon-Fri, false otherwise
+ */
+function isWeekday(dateStr) {
+  const date = new Date(dateStr + 'T00:00:00');
+  const dayOfWeek = date.getDay();
+  return dayOfWeek >= 1 && dayOfWeek <= 5;
+}
 
-    const dayIndex = convertDayToIndex(appointment_day);
-    if (dayIndex === null) {
-      return res.status(400).json({ success: false, message: 'Invalid day' });
-    }
+/**
+ * Checks if date is in the past
+ */
+function isPastDate(dateStr) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const appointmentDate = new Date(dateStr + 'T00:00:00');
+  return appointmentDate < today;
+}
 
-    // Check if appointment is within doctor's availability
-    if (!isWithinAvailability(doctor, dayIndex)) {
-      return res.status(409).json({ success: false, message: 'Doctor not available at that time' });
-    }
+/**
+ * Validates slot number (must be 0-7)
+ */
+function isValidSlot(slot) {
+  return Number.isInteger(slot) && slot >= 0 && slot <= 7;
+}
 
-    // Atomically decrement the availableSlots for the given dayIndex by 1
-    try {
-      const updateResult = await DoctorModel.updateOne(
-        { 
-          _id: doctor_id,
-          [`availableSlots.${dayIndex}`]: { $gt: 0 }
-        },
-        { 
-          $inc: { [`availableSlots.${dayIndex}`]: -1 }
-        }
-      );
-    
-      if (updateResult.modifiedCount === 0) {
-        return res.status(409).json({ 
-          success: false, 
-          message: 'No available slots for this day' 
-        });
-      }
-    } catch (err) {
-      return res.status(500).json({ 
-        success: false, 
-        message: 'Failed to update doctor availability' 
-      });
-    }
-
-    const sameDayAppointments = await AppointmentModel.find({
-      doctorId: doctor_id,
-      status: 'BOOKED',
-      appointmentDay: appointment_day
-    });
-
-    if (sameDayAppointments.length > 0) {
-      return res.status(409).json({ success: false, message: 'Time slot already booked' });
-    }
-
-    // Create appointment
-    const appointment = await AppointmentModel.create({
-      patientId: patient_id,
-      doctorId: doctor_id,
-      appointmentDay: appointment_day.toLowerCase(),
-      status: 'BOOKED'
-    });
-
-    return res.status(201).json({ 
-      success: true, 
-      data: appointment, 
-      message: 'Appointment booked successfully' 
-    });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to book appointment' });
-  }
-};
-
-// Get patient's appointments
-export const getAppointmentsForPatient = async (req, res) => {
-  try {
-    const { patient_id } = req.params;
-
-    const appointments = await AppointmentModel.find({ patientId: patient_id })
-      .sort({ appointmentDate: 1 })
-      .populate({
-        path: 'doctorId',
-        populate: { path: 'userId', select: 'name' },
-        select: 'specialization userId'
-      });
-
-    const data = appointments.map((appt) => ({
-      appointment_id: appt._id,
-      appointment_date: appt.appointmentDate,
-      status: appt.status,
-      doctor: {
-        doctor_id: appt.doctorId?._id,
-        name: appt.doctorId?.userId?.name || 'Unknown',
-        specialization: appt.doctorId?.specialization || 'N/A'
-      }
-    }));
-
-    return res.status(200).json({ success: true, data });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to fetch appointments' });
-  }
-};
-
-// Get doctor's appointments
-export const getAppointmentsForDoctor = async (req, res) => {
+/**
+ * Returns availability for all 8 slots for a given doctor and date.
+ *
+ * @param {string} doctorId - Doctor's ID
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @returns {Object} Result with slots array or error
+ */
+export const getDaySlots = async (req, res) => {
   try {
     const { doctor_id } = req.params;
     const { date } = req.query;
 
-    const filter = { doctorId: doctor_id };
-
-    // Optional: filter by specific date
-    if (date) {
-      const d = new Date(date);
-      if (!isNaN(d.getTime())) {
-        const { start, end } = dayBounds(d);
-        filter.appointmentDate = { $gte: start, $lte: end };
-      }
+    // Validate date format
+    if (!isValidDateFormat(date)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid date format. Expected YYYY-MM-DD'
+      });
     }
 
-    const appointments = await AppointmentModel.find(filter)
-      .sort({ appointmentDate: 1 })
-      .populate({ path: 'patientId', select: 'name' });
+    // Validate weekday
+    if (!isWeekday(date)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Date must be a weekday (Monday-Friday)'
+      });
+    }
 
-    const data = appointments.map((appt) => ({
-      appointment_id: appt._id,
-      appointment_date: appt.appointmentDate,
-      status: appt.status,
-      patient: {
-        patient_id: appt.patientId?._id,
-        name: appt.patientId?.name || 'Unknown'
-      }
-    }));
+    // Query all booked appointments for this doctor and date
+    const bookedAppointments = await AppointmentModel.find({
+      doctorId: doctor_id,
+      date: date,
+      status: 'BOOKED'
+    });
 
-    return res.status(200).json({ success: true, data });
+    // Build a map of booked slots
+    const bookedSlots = {};
+    for (const appt of bookedAppointments) {
+      bookedSlots[appt.slot] = appt.patientId.toString();
+    }
+
+    // Build result array with all 8 slots
+    const slots = [];
+    for (let i = 0; i < 8; i++) {
+      slots.push({
+        slot: i,
+        time: SLOT_TIMES[i],
+        available: !bookedSlots[i],
+        bookedBy: bookedSlots[i] || null
+      });
+    }
+
+    return res.status(200).json({
+      ok: true,
+      date: date,
+      doctorId: doctor_id,
+      slots: slots
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to fetch appointments' });
+    return res.status(500).json({
+      ok: false,
+      code: 'SERVER_ERROR',
+      message: error.message
+    });
   }
 };
 
-// Cancel appointment
+/**
+ * Books an appointment with a best-effort application-level pre-check.
+ * This approach tolerates race conditions and does NOT rely on DB unique indexes.
+ *
+ * @param {string} doctorId - Doctor's ID
+ * @param {string} patientId - Patient's ID
+ * @param {string} date - Date in YYYY-MM-DD format
+ * @param {number} slot - Slot number (0-7)
+ * @returns {Object} Result with appointment data or error
+ */
+export const bookAppointment = async (req, res) => {
+  try {
+    const { doctor_id, patient_id, date, slot } = req.body;
+
+    // Validation step a: Ensure slot is integer 0..7
+    if (!isValidSlot(slot)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Slot must be an integer between 0 and 7'
+      });
+    }
+
+    // Validation step b: Ensure date is valid YYYY-MM-DD
+    if (!isValidDateFormat(date)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid date format. Expected YYYY-MM-DD'
+      });
+    }
+
+    // Validation step c: Ensure date is weekday Mon-Fri
+    if (!isWeekday(date)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Appointments only available Monday through Friday'
+      });
+    }
+
+    // Validation step d: Reject past dates
+    if (isPastDate(date)) {
+      return res.status(400).json({
+        ok: false,
+        code: 'VALIDATION_ERROR',
+        message: 'Cannot book appointments in the past'
+      });
+    }
+
+    // Best-effort pre-check: see if slot already booked
+    const existing = await AppointmentModel.findOne({
+      doctorId: doctor_id,
+      date: date,
+      slot: slot,
+      status: 'BOOKED'
+    });
+    if (existing) {
+      return res.status(409).json({
+        ok: false,
+        code: 'SLOT_TAKEN',
+        message: 'Slot already booked for this doctor/date/slot'
+      });
+    }
+
+    const appointment = await AppointmentModel.create({
+      doctorId: doctor_id,
+      patientId: patient_id,
+      date: date,
+      slot: slot,
+      status: 'BOOKED'
+    });
+
+    return res.status(201).json({
+      ok: true,
+      appointment: {
+        _id: appointment._id,
+        doctorId: appointment.doctorId,
+        patientId: appointment.patientId,
+        date: appointment.date,
+        slot: appointment.slot,
+        time: SLOT_TIMES[appointment.slot],
+        status: appointment.status,
+        createdAt: appointment.createdAt
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      code: 'SERVER_ERROR',
+      message: error.message
+    });
+  }
+};
+
+/**
+ * Cancels an appointment by setting status to CANCELLED and setting cancelledAt timestamp.
+ *
+ * @param {string} appointmentId - Appointment ID
+ * @param {string} patientId - Patient ID (for authorization)
+ * @returns {Object} Result with cancelled appointment or error
+ */
 export const cancelAppointment = async (req, res) => {
   try {
     const { appointment_id } = req.params;
+    const { patient_id } = req.body;
 
-    const appointment = await AppointmentModel.findByIdAndUpdate(
-      appointment_id,
-      { status: 'CANCELLED' },
-      { new: true }
-    );
+    // Find the appointment
+    const appointment = await AppointmentModel.findById(appointment_id);
 
     if (!appointment) {
-      return res.status(404).json({ success: false, message: 'Appointment not found' });
+      return res.status(404).json({
+        ok: false,
+        code: 'NOT_FOUND',
+        message: 'Appointment not found'
+      });
     }
 
-    return res.status(200).json({ success: true, data: appointment });
-  } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to cancel appointment' });
-  }
-};
-
-// Complete appointment
-export const completeAppointment = async (req, res) => {
-  try {
-    const { appointment_id } = req.params;
-
-    const appointment = await AppointmentModel.findByIdAndUpdate(
-      appointment_id,
-      { status: 'COMPLETED' },
-      { new: true }
-    );
-
-    if (!appointment) {
-      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    // Check if already cancelled
+    if (appointment.status === 'CANCELLED') {
+      return res.status(400).json({
+        ok: false,
+        code: 'ALREADY_CANCELLED',
+        message: 'Appointment is already cancelled'
+      });
     }
 
-    return res.status(200).json({ success: true, data: appointment });
+    // Verify patient_id matches (authorization check)
+    if (appointment.patientId.toString() !== patient_id) {
+      return res.status(403).json({
+        ok: false,
+        code: 'NOT_AUTHORIZED',
+        message: 'Not authorized to cancel this appointment'
+      });
+    }
+
+    // Update appointment to CANCELLED
+    appointment.status = 'CANCELLED';
+    appointment.cancelledAt = new Date();
+    await appointment.save();
+
+    return res.status(200).json({
+      ok: true,
+      appointment: {
+        _id: appointment._id,
+        doctorId: appointment.doctorId,
+        patientId: appointment.patientId,
+        date: appointment.date,
+        slot: appointment.slot,
+        status: appointment.status,
+        createdAt: appointment.createdAt,
+        cancelledAt: appointment.cancelledAt
+      }
+    });
   } catch (error) {
-    return res.status(500).json({ success: false, message: 'Failed to complete appointment' });
+    return res.status(500).json({
+      ok: false,
+      code: 'SERVER_ERROR',
+      message: error.message
+    });
   }
 };

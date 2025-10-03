@@ -14,24 +14,36 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-    appointmentDay: {
+    date: {
       type: String,
-      enum: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
-      required: true
+      required: true,
+      match: /^\d{4}-\d{2}-\d{2}$/  // YYYY-MM-DD format
+    },
+    slot: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 7
     },
     status: {
       type: String,
-      enum: ['BOOKED', 'COMPLETED', 'CANCELLED'],
+      enum: ['BOOKED', 'CANCELLED'],
       default: 'BOOKED',
       required: true,
       index: true
+    },
+    cancelledAt: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }
 );
 
-appointmentSchema.index({ doctorId: 1, appointmentDate: 1 });
-appointmentSchema.index({ patientId: 1, appointmentDate: 1 });
+// Note: No unique index on (doctorId, date, slot). Best-effort checks are done at app level.
+
+// Additional indexes for queries
+appointmentSchema.index({ patientId: 1, date: 1 });
 
 export const AppointmentModel = mongoose.model('Appointment', appointmentSchema);
 
