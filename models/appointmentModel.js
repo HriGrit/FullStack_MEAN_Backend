@@ -14,8 +14,9 @@ const appointmentSchema = new mongoose.Schema(
       required: true,
       index: true
     },
-    appointmentDate: {
-      type: Date,
+    appointmentDay: {
+      type: String,
+      enum: ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'],
       required: true
     },
     status: {

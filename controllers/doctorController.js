@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 import { DoctorModel } from '../models/doctorModel.js';
 import { AppointmentModel } from '../models/appointmentModel.js';
-import { parseAvailability, isDateWithinAvailability, dayBounds } from '../services/availabilityService.js';
 
 export const getAvailableDoctors = async (req, res) => {
   try {

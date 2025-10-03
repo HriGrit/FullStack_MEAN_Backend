@@ -21,6 +21,10 @@ const doctorSchema = new mongoose.Schema(
       type: String,
       maxlength: 100,
       default: 'MON-FRI 10am-6pm'
+    },
+    availableSlots : {
+      type: [Number],
+      default: [20, 20, 20, 20, 20, 20, 20]
     }
   },
   { timestamps: true }
