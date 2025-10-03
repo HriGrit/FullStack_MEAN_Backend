@@ -89,7 +89,7 @@ export const userSignIn = async (req, res) => {
 
     return res
       .cookie('accessToken', accessToken, {
-        maxAge: 15 * 60 * 1000, // 15 minutes
+        maxAge: 24 * 60 * 60 * 1000, // 15 minutes
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/api',
