@@ -19,7 +19,8 @@ const doctorSchema = new mongoose.Schema(
     },
     availability: {
       type: String,
-      maxlength: 100
+      maxlength: 100,
+      default: 'MON-FRI 10am-6pm'
     }
   },
   { timestamps: true }

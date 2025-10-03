@@ -5,7 +5,10 @@ import cookieParser from 'cookie-parser';
 
 import connectDB from './config/connectMongoDB.js';
 import userRouter from './routes/authRoutes.js';
-import adminRouter from './routes/adminRoutes.js'
+import adminRouter from './routes/adminRoutes.js';
+import patientRouter from './routes/patientRoutes.js';
+import doctorRouter from './routes/doctorRoutes.js';
+import appointmentRouter from './routes/appointmentRoutes.js';
 
 const app = express();
 const port = process.env.PORT || 1313;
@@ -22,6 +25,9 @@ app.use(cors({
 
 app.use( '/api/v1', userRouter );
 app.use('/api/v1/admin',adminRouter);
+app.use('/api/v1/patient', patientRouter);
+app.use('/api/v1/doctors', doctorRouter);
+app.use('/api/v1/appointments', appointmentRouter);
 
 app.get('/', function(req, res) {
     console.log("root"); 
