@@ -20,11 +20,11 @@ app.use(cors({
 
 
 app.use( '/api/v1', userRouter );
-app.use('/api/v1/admin',adminRouter)
-app.use('/',(res)=>{
-    return res.status(401).json({
-        "message":"Not exists"
-    })
+app.use('/api/v1/admin',adminRouter);
+
+app.get('/', function(req, res) {
+    console.log("root"); 
+    res.json({'status':'working'});
 })
 
 app.listen(port, function() {
