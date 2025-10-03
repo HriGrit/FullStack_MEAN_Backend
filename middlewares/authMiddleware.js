@@ -1,24 +1,67 @@
-import jwt from 'jsonwebtoken';
+/**
+ * Implementing a Stateless Approach
+ * 
+ * Fetching Access Token from request via Cookies
+ * Using httpOnly Cookies to make it inaccessible to JavaScript
+ */
+import { User } from '../models/userModel.js';
+import { verifyAccessToken } from '../services/jwtServices.js';
 
-const JWT_SECRET = process.env.JWT_SECRET ;
+export async function authenticateJWT(req, res, next) {
+  const accessToken = req.cookies.accessToken;
+  const refreshToken = req.cookies.refreshToken;
 
-export function authenticateJWT(req, res, next) {
-  const authHeader = req.headers.authorization;
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ message: 'Authorization token missing or malformed' });
+  if (!accessToken) {
+    return res.status(401).json({
+      success: false,
+      message: 'Access token missing. Please log in.'
+    });
   }
 
-  const token = authHeader.split(' ')[1];
-
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.userId = decoded.userId; 
-    req.role=decoded.role;
-    console.log(req.userId);
-    console.log(req.role);
+    const verifiedAccessToken = verifyAccessToken(accessToken);
+    
+    const userId = verifiedAccessToken.id;
+    const userRole = verifiedAccessToken.role;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid Token'
+      });
+    }
+
+    // Fetch user from database to ensure they still exist
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Attach user information to request object
+    req.userId = userId;
+    req.role = userRole;
+    req.user = user;
+
     next();
-  } catch (err) {
-    return res.status(401).json({ message: 'Invalid or expired token' });
+  } catch (error) {
+    // Handle token expiration
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({
+        success: false,
+        message: 'Access token expired. Please refresh your token.',
+        error: 'TokenExpiredError'
+      });
+    }
+
+    // Handle other JWT errors
+    return res.status(401).json({
+      success: false,
+      message: 'Invalid or malformed token',
+      error: error.message
+    });
   }
 }
