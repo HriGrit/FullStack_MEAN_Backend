@@ -94,14 +94,14 @@ export const userSignIn = async (req, res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-        sameSite: 'strict'
+        sameSite: 'none'
       })
       .cookie('refreshToken', refreshToken, {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-        sameSite: 'strict'
+        sameSite: 'none'
       })
       .status(200)
       .json({
@@ -153,14 +153,14 @@ export const refreshTokens = async (req, res) => {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-        sameSite: 'strict'
+        sameSite: 'none'
       })
       .cookie('refreshToken', newRefreshToken, {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         path: '/',
-        sameSite: 'strict'
+        sameSite: 'none'
       })
       .status(200)
       .json({
