@@ -3,6 +3,17 @@ import { userSignUpSchema, userSignInSchema } from '../models/zodValidationModel
 import { hashPassword, comparePasswords } from '../services/hashServices.js';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../services/jwtServices.js';
 
+// Helper to get cookie options based on environment
+const getCookieOptions = (path = '/') => {
+  const isProd = process.env.NODE_ENV === 'production';
+  return {
+    httpOnly: true,
+    secure: isProd,
+    path,
+    sameSite: isProd ? 'none' : 'lax',
+  };
+};
+
 export const userSignup = async (req, res) => {
   
   const parsedBodyData = userSignUpSchema.safeParse(req.body);
@@ -33,21 +44,13 @@ export const userSignup = async (req, res) => {
       const accessToken = await generateAccessToken(newUser._id, newUser.role);
       const refreshToken = await generateRefreshToken(newUser._id, newUser.role);
 
+      const cookieOptions = getCookieOptions('/');
+      const refreshCookieOptions = { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 };
+      const accessCookieOptions = { ...cookieOptions, maxAge: 15 * 60 * 1000 };
+
       return res
-        .cookie('accessToken', accessToken, {
-          maxAge: 15 * 60 * 1000, // 15 minutes
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          path: '/api',
-          sameSite: 'strict'
-        })
-        .cookie('refreshToken', refreshToken, {
-          maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-          httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          path: '/api',
-          sameSite: 'strict'
-        })
+        .cookie('accessToken', accessToken, accessCookieOptions)
+        .cookie('refreshToken', refreshToken, refreshCookieOptions)
         .status(201)
         .json({
           success: true,
@@ -88,21 +91,13 @@ export const userSignIn = async (req, res) => {
     const accessToken = await generateAccessToken(userExists._id, userExists.role);
     const refreshToken = await generateRefreshToken(userExists._id, userExists.role);
 
+    const cookieOptions = getCookieOptions('/');
+    const refreshCookieOptions = { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 };
+    const accessCookieOptions = { ...cookieOptions, maxAge: 24 * 60 * 60 * 1000 };
+
     return res
-      .cookie('accessToken', accessToken, {
-        maxAge: 24 * 60 * 60 * 1000, // 15 minutes
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'none'
-      })
-      .cookie('refreshToken', refreshToken, {
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'none'
-      })
+      .cookie('accessToken', accessToken, accessCookieOptions)
+      .cookie('refreshToken', refreshToken, refreshCookieOptions)
       .status(200)
       .json({
         success: true,
@@ -147,21 +142,13 @@ export const refreshTokens = async (req, res) => {
     const newAccessToken = await generateAccessToken(user._id, user.role);
     const newRefreshToken = await generateRefreshToken(user._id, user.role);
 
+    const cookieOptions = getCookieOptions('/');
+    const refreshCookieOptions = { ...cookieOptions, maxAge: 7 * 24 * 60 * 60 * 1000 };
+    const accessCookieOptions = { ...cookieOptions, maxAge: 15 * 60 * 1000 };
+
     return res
-      .cookie('accessToken', newAccessToken, {
-        maxAge: 15 * 60 * 1000, // 15 minutes
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'none'
-      })
-      .cookie('refreshToken', newRefreshToken, {
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        path: '/',
-        sameSite: 'none'
-      })
+      .cookie('accessToken', newAccessToken, accessCookieOptions)
+      .cookie('refreshToken', newRefreshToken, refreshCookieOptions)
       .status(200)
       .json({
         success: true,
@@ -182,9 +169,10 @@ export const refreshTokens = async (req, res) => {
  */
 export const userLogout = async (req, res) => {
   try {
+    const cookieOptions = getCookieOptions('/');
     return res
-      .clearCookie('accessToken', { path: '/' })
-      .clearCookie('refreshToken', { path: '/' })
+      .clearCookie('accessToken', cookieOptions)
+      .clearCookie('refreshToken', cookieOptions)
       .status(200)
       .json({
         success: true,
