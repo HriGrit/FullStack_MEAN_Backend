@@ -17,9 +17,27 @@ connectDB();
 
 app.use(express.json());
 app.use(cookieParser());
+const allowedOrigins = [
+  process.env.FRONTEND_URL, // Your production URL
+  'http://localhost:5173',   // Local development
+  'http://localhost:3000',   // Alternative local port
+  'http://localhost:5174', 
+  'http://localhost:4200',   // Vite preview or other ports
+     // Vite preview or other ports
+].filter(Boolean); // Removes any undefined values
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true // Required for cookies
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like Postman, mobile apps, curl)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true
 }));
 
 app.use( '/api/v1', userRouter );
