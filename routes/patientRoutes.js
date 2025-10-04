@@ -1,11 +1,10 @@
 import express from 'express';
 import { authenticateJWT } from '../middlewares/authMiddleware.js';
 import { authorizeRoles } from '../middlewares/roleMiddleware.js';
-import { getAllDepartments, getAllDoctors } from '../controllers/patientController.js';
+import { getAllDepartments } from '../controllers/patientController.js';
 
 const router = express.Router();
 
-router.get('/departments',authenticateJWT,authorizeRoles('PATIENT'),getAllDepartments);
-router.get('/doctors',authenticateJWT,authorizeRoles('PATIENT'),getAllDoctors);
+router.get('/departments',authenticateJWT,authorizeRoles('PATIENT','DOCTOR','ADMIN'),getAllDepartments);
 
 export default router;
