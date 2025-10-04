@@ -59,20 +59,12 @@ export const getDaySlots = async (req, res) => {
 
     // Validate date format
     if (!isValidDateFormat(date)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Invalid date format. Expected YYYY-MM-DD'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid date format. Expected YYYY-MM-DD' } });
     }
 
     // Validate weekday
     if (!isWeekday(date)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Date must be a weekday (Monday-Friday)'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Date must be a weekday (Monday-Friday)' } });
     }
 
     // Query all booked appointments for this doctor and date
@@ -99,18 +91,9 @@ export const getDaySlots = async (req, res) => {
       });
     }
 
-    return res.status(200).json({
-      ok: true,
-      date: date,
-      doctorId: doctor_id,
-      slots: slots
-    });
+    return res.status(200).json({ success: true, data: { date, doctorId: doctor_id, slots } });
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      code: 'SERVER_ERROR',
-      message: error.message
-    });
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
   }
 };
 
@@ -130,38 +113,22 @@ export const bookAppointment = async (req, res) => {
 
     // Validation step a: Ensure slot is integer 0..7
     if (!isValidSlot(slot)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Slot must be an integer between 0 and 7'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Slot must be an integer between 0 and 7' } });
     }
 
     // Validation step b: Ensure date is valid YYYY-MM-DD
     if (!isValidDateFormat(date)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Invalid date format. Expected YYYY-MM-DD'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid date format. Expected YYYY-MM-DD' } });
     }
 
     // Validation step c: Ensure date is weekday Mon-Fri
     if (!isWeekday(date)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Appointments only available Monday through Friday'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Appointments only available Monday through Friday' } });
     }
 
     // Validation step d: Reject past dates
     if (isPastDate(date)) {
-      return res.status(400).json({
-        ok: false,
-        code: 'VALIDATION_ERROR',
-        message: 'Cannot book appointments in the past'
-      });
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Cannot book appointments in the past' } });
     }
 
     // Best-effort pre-check: see if slot already booked
@@ -172,11 +139,7 @@ export const bookAppointment = async (req, res) => {
       status: 'BOOKED'
     });
     if (existing) {
-      return res.status(409).json({
-        ok: false,
-        code: 'SLOT_TAKEN',
-        message: 'Slot already booked for this doctor/date/slot'
-      });
+      return res.status(409).json({ success: false, error: { code: 'SLOT_TAKEN', message: 'Slot already booked for this doctor/date/slot' } });
     }
 
     const appointment = await AppointmentModel.create({
@@ -187,25 +150,18 @@ export const bookAppointment = async (req, res) => {
       status: 'BOOKED'
     });
 
-    return res.status(201).json({
-      ok: true,
-      appointment: {
-        _id: appointment._id,
-        doctorId: appointment.doctorId,
-        patientId: appointment.patientId,
-        date: appointment.date,
-        slot: appointment.slot,
-        time: SLOT_TIMES[appointment.slot],
-        status: appointment.status,
-        createdAt: appointment.createdAt
-      }
-    });
+    return res.status(201).json({ success: true, data: {
+      _id: appointment._id,
+      doctorId: appointment.doctorId,
+      patientId: appointment.patientId,
+      date: appointment.date,
+      slot: appointment.slot,
+      time: SLOT_TIMES[appointment.slot],
+      status: appointment.status,
+      createdAt: appointment.createdAt
+    }});
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      code: 'SERVER_ERROR',
-      message: error.message
-    });
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
   }
 };
 
@@ -225,29 +181,17 @@ export const cancelAppointment = async (req, res) => {
     const appointment = await AppointmentModel.findById(appointment_id);
 
     if (!appointment) {
-      return res.status(404).json({
-        ok: false,
-        code: 'NOT_FOUND',
-        message: 'Appointment not found'
-      });
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Appointment not found' } });
     }
 
     // Check if already cancelled
     if (appointment.status === 'CANCELLED') {
-      return res.status(400).json({
-        ok: false,
-        code: 'ALREADY_CANCELLED',
-        message: 'Appointment is already cancelled'
-      });
+      return res.status(400).json({ success: false, error: { code: 'ALREADY_CANCELLED', message: 'Appointment is already cancelled' } });
     }
 
     // Verify patient_id matches (authorization check)
     if (appointment.patientId.toString() !== patient_id) {
-      return res.status(403).json({
-        ok: false,
-        code: 'NOT_AUTHORIZED',
-        message: 'Not authorized to cancel this appointment'
-      });
+      return res.status(403).json({ success: false, error: { code: 'NOT_AUTHORIZED', message: 'Not authorized to cancel this appointment' } });
     }
 
     // Update appointment to CANCELLED
@@ -255,24 +199,17 @@ export const cancelAppointment = async (req, res) => {
     appointment.cancelledAt = new Date();
     await appointment.save();
 
-    return res.status(200).json({
-      ok: true,
-      appointment: {
-        _id: appointment._id,
-        doctorId: appointment.doctorId,
-        patientId: appointment.patientId,
-        date: appointment.date,
-        slot: appointment.slot,
-        status: appointment.status,
-        createdAt: appointment.createdAt,
-        cancelledAt: appointment.cancelledAt
-      }
-    });
+    return res.status(200).json({ success: true, data: {
+      _id: appointment._id,
+      doctorId: appointment.doctorId,
+      patientId: appointment.patientId,
+      date: appointment.date,
+      slot: appointment.slot,
+      status: appointment.status,
+      createdAt: appointment.createdAt,
+      cancelledAt: appointment.cancelledAt
+    }});
   } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      code: 'SERVER_ERROR',
-      message: error.message
-    });
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
   }
 };
