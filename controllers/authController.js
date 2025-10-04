@@ -93,14 +93,14 @@ export const userSignIn = async (req, res) => {
         maxAge: 24 * 60 * 60 * 1000, // 15 minutes
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        path: '/api',
+        path: '/',
         sameSite: 'strict'
       })
       .cookie('refreshToken', refreshToken, {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        path: '/api',
+        path: '/',
         sameSite: 'strict'
       })
       .status(200)
@@ -152,14 +152,14 @@ export const refreshTokens = async (req, res) => {
         maxAge: 15 * 60 * 1000, // 15 minutes
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        path: '/api',
+        path: '/',
         sameSite: 'strict'
       })
       .cookie('refreshToken', newRefreshToken, {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        path: '/api',
+        path: '/',
         sameSite: 'strict'
       })
       .status(200)
@@ -183,8 +183,8 @@ export const refreshTokens = async (req, res) => {
 export const userLogout = async (req, res) => {
   try {
     return res
-      .clearCookie('accessToken', { path: '/api' })
-      .clearCookie('refreshToken', { path: '/api' })
+      .clearCookie('accessToken', { path: '/' })
+      .clearCookie('refreshToken', { path: '/' })
       .status(200)
       .json({
         success: true,
