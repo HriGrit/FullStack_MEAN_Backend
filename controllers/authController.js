@@ -51,6 +51,7 @@ export const userSignup = async (req, res) => {
         .status(201)
         .json({
           success: true,
+          role: newUser.role,
           message: 'User registered successfully',
         });
     }
@@ -105,6 +106,7 @@ export const userSignIn = async (req, res) => {
       .status(200)
       .json({
         success: true,
+        role: userExists.role,
         message: 'User logged in successfully',
       });
   } catch (e) {
