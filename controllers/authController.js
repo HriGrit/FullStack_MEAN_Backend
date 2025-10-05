@@ -55,7 +55,9 @@ export const userSignup = async (req, res) => {
         .json({
           success: true,
           role: newUser.role,
-          userId: newUser._id,
+          user: {
+            id: newUser._id
+          },
           message: 'User registered successfully',
         });
     }
