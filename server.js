@@ -18,13 +18,14 @@ connectDB();
 app.use(express.json());
 app.use(cookieParser());
 const allowedOrigins = [
-  process.env.FRONTEND_URL, // Your production URL
-  'http://localhost:5173',   // Local development
-  'http://localhost:3000',   // Alternative local port
-  'http://localhost:5174',
-  'http://localhost:4200', 
-  'https://health-frontend-pi.vercel.app'          // Vite preview or other ports
-     // Vite preview or other ports
+  '*'
+  // process.env.FRONTEND_URL, // Your production URL
+  // 'http://localhost:5173',   // Local development
+  // 'http://localhost:3000',   // Alternative local port
+  // 'http://localhost:5174',
+  // 'http://localhost:4200',
+  // 'https://health-frontend-pi.vercel.app'          // Vite preview or other ports
+  //    // Vite preview or other ports
 ].filter(Boolean); // Removes any undefined values
 
 app.use(cors({
