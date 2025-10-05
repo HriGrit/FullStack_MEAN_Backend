@@ -21,7 +21,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL, // Your production URL
   'http://localhost:5173',   // Local development
   'http://localhost:3000',   // Alternative local port
-  'http://localhost:5174', 
+  'http://localhost:5174',
   'http://localhost:4200',   // Vite preview or other ports
      // Vite preview or other ports
 ].filter(Boolean); // Removes any undefined values
@@ -30,7 +30,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like Postman, mobile apps, curl)
     if (!origin) return callback(null, true);
-    
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -40,7 +40,7 @@ app.use(cors({
   credentials: true
 }));
 
-app.use( '/api/v1', userRouter );
+app.use('/api/v1', userRouter );
 app.use('/api/v1/admin',adminRouter);
 app.use('/api/v1/patient', patientRouter);
 app.use('/api/v1/doctors', doctorRouter);

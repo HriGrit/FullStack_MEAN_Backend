@@ -15,7 +15,7 @@ const getCookieOptions = (path = '/') => {
 };
 
 export const userSignup = async (req, res) => {
-  
+
   const parsedBodyData = userSignUpSchema.safeParse(req.body);
   if (!parsedBodyData.success) {
     return res.status(400).json({ error: parsedBodyData.error.message});
@@ -55,6 +55,7 @@ export const userSignup = async (req, res) => {
         .json({
           success: true,
           role: newUser.role,
+          userId: newUser._id,
           message: 'User registered successfully',
         });
     }
@@ -68,11 +69,11 @@ export const userSignIn = async (req, res) => {
   if (!parsedUserData.success) {
     return res.status(400).json({ error: parsedUserData.error.message });
   }
-  
+
   try {
     const { email, password } = parsedUserData.data;
     const userExists = await User.findOne({ email });
-    
+
     if (!userExists) {
       return res.status(411).json({
         success: false,
@@ -102,6 +103,9 @@ export const userSignIn = async (req, res) => {
       .json({
         success: true,
         role: userExists.role,
+        user: {
+          id: userExists._id
+        },
         message: 'User logged in successfully',
       });
   } catch (e) {
@@ -128,7 +132,7 @@ export const refreshTokens = async (req, res) => {
 
   try {
     const decoded = verifyRefreshToken(refreshToken);
-    
+
     // Verify user still exists
     const user = await User.findById(decoded.id);
     if (!user) {

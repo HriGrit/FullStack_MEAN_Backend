@@ -1,4 +1,7 @@
 import { AppointmentModel } from '../models/appointmentModel.js';
+import { DoctorModel } from '../models/doctorModel.js';
+import { User } from '../models/userModel.js';
+import { Department } from '../models/departmentModel.js';
 
 const SLOT_TIMES = [
   "10:00-11:00",
@@ -209,6 +212,81 @@ export const cancelAppointment = async (req, res) => {
       createdAt: appointment.createdAt,
       cancelledAt: appointment.cancelledAt
     }});
+  } catch (error) {
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
+
+/**
+ * Fetches a single appointment by ID with populated doctor and patient data.
+ *
+ * @param {string} appointmentId - Appointment ID
+ * @returns {Object} Result with appointment data including doctor and patient details
+ */
+export const getAppointmentById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Find the appointment first
+    const appointment = await AppointmentModel.findById(id);
+
+    if (!appointment) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Appointment not found' } });
+    }
+
+    // Fetch doctor data with populated user and department
+    const doctor = await DoctorModel.findById(appointment.doctorId)
+      .populate('userId')
+      .populate('deptId');
+
+    // Fetch patient data
+    const patient = await User.findById(appointment.patientId);
+
+    if (!doctor) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Doctor not found' } });
+    }
+
+    if (!patient) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Patient not found' } });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        id: appointment._id,
+        date: appointment.date,
+        slot: appointment.slot,
+        time: SLOT_TIMES[appointment.slot],
+        status: appointment.status,
+        cancelledAt: appointment.cancelledAt,
+        createdAt: appointment.createdAt,
+        updatedAt: appointment.updatedAt,
+        doctor: {
+          id: doctor._id,
+          specialization: doctor.specialization,
+          availability: doctor.availability,
+          availableSlots: doctor.availableSlots,
+          user: {
+            id: doctor.userId._id,
+            name: doctor.userId.name,
+            email: doctor.userId.email,
+            phone: doctor.userId.phone,
+            role: doctor.userId.role
+          },
+          department: doctor.deptId ? {
+            id: doctor.deptId._id,
+            name: doctor.deptId.name
+          } : null
+        },
+        patient: {
+          id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          role: patient.role
+        }
+      }
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
   }

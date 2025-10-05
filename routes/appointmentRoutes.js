@@ -4,12 +4,14 @@ import { authorizeRoles } from '../middlewares/roleMiddleware.js';
 import {
   bookAppointment,
   getDaySlots,
-  cancelAppointment
+  cancelAppointment,
+  getAppointmentById
 } from '../controllers/appointmentController.js';
 
 const router = express.Router();
 
 router.get('/slots/:doctor_id', authenticateJWT, getDaySlots);
+router.get('/:id', authenticateJWT, getAppointmentById);
 router.post('/book', authenticateJWT, authorizeRoles('PATIENT'), bookAppointment);
 router.patch('/:appointment_id/cancel', authenticateJWT, authorizeRoles('PATIENT'), cancelAppointment);
 
