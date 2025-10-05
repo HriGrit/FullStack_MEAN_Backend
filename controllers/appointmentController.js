@@ -178,7 +178,7 @@ export const bookAppointment = async (req, res) => {
 export const cancelAppointment = async (req, res) => {
   try {
     const { appointment_id } = req.params;
-    const { patient_id } = req.body;
+    const patientId = req.userId;
 
     // Find the appointment
     const appointment = await AppointmentModel.findById(appointment_id);
@@ -193,7 +193,7 @@ export const cancelAppointment = async (req, res) => {
     }
 
     // Verify patient_id matches (authorization check)
-    if (appointment.patientId.toString() !== patient_id) {
+    if (appointment.patientId.toString() !== patientId) {
       return res.status(403).json({ success: false, error: { code: 'NOT_AUTHORIZED', message: 'Not authorized to cancel this appointment' } });
     }
 
@@ -287,6 +287,133 @@ export const getAppointmentById = async (req, res) => {
         }
       }
     });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
+
+/**
+ * Fetches all appointments for the authenticated patient (from JWT).
+ * Returns array of appointments with expanded doctor and patient data, same shape as getAppointmentById.
+ */
+export const getPatientAppointments = async (req, res) => {
+  try {
+    const patientId = req.userId;
+
+    const appointments = await AppointmentModel.find({ patientId }).sort({ date: -1, slot: -1 });
+
+    const results = [];
+    for (const appointment of appointments) {
+      const doctor = await DoctorModel.findById(appointment.doctorId)
+        .populate('userId')
+        .populate('deptId');
+      const patient = await User.findById(appointment.patientId);
+
+      if (!doctor || !patient) continue;
+
+      results.push({
+        id: appointment._id,
+        date: appointment.date,
+        slot: appointment.slot,
+        time: SLOT_TIMES[appointment.slot],
+        status: appointment.status,
+        cancelledAt: appointment.cancelledAt,
+        createdAt: appointment.createdAt,
+        updatedAt: appointment.updatedAt,
+        doctor: {
+          id: doctor._id,
+          specialization: doctor.specialization,
+          availability: doctor.availability,
+          availableSlots: doctor.availableSlots,
+          user: doctor.userId ? {
+            id: doctor.userId._id,
+            name: doctor.userId.name,
+            email: doctor.userId.email,
+            phone: doctor.userId.phone,
+            role: doctor.userId.role
+          } : null,
+          department: doctor.deptId ? {
+            id: doctor.deptId._id,
+            name: doctor.deptId.name
+          } : null
+        },
+        patient: patient ? {
+          id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          role: patient.role
+        } : null
+      });
+    }
+
+    return res.status(200).json({ success: true, data: results });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
+  }
+};
+
+/**
+ * Fetches all appointments for the authenticated doctor (from JWT via mapping to Doctor document).
+ * Returns array of appointments with expanded doctor and patient data, same shape as getAppointmentById.
+ */
+export const getDoctorAppointments = async (req, res) => {
+  try {
+    const userId = req.userId;
+
+    const doctor = await DoctorModel.findOne({ userId });
+    if (!doctor) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Doctor profile not found for user' } });
+    }
+
+    const appointments = await AppointmentModel.find({ doctorId: doctor._id }).sort({ date: -1, slot: -1 });
+
+    const results = [];
+    for (const appointment of appointments) {
+      const populatedDoctor = await DoctorModel.findById(appointment.doctorId)
+        .populate('userId')
+        .populate('deptId');
+      const patient = await User.findById(appointment.patientId);
+
+      if (!populatedDoctor || !patient) continue;
+
+      results.push({
+        id: appointment._id,
+        date: appointment.date,
+        slot: appointment.slot,
+        time: SLOT_TIMES[appointment.slot],
+        status: appointment.status,
+        cancelledAt: appointment.cancelledAt,
+        createdAt: appointment.createdAt,
+        updatedAt: appointment.updatedAt,
+        doctor: {
+          id: populatedDoctor._id,
+          specialization: populatedDoctor.specialization,
+          availability: populatedDoctor.availability,
+          availableSlots: populatedDoctor.availableSlots,
+          user: populatedDoctor.userId ? {
+            id: populatedDoctor.userId._id,
+            name: populatedDoctor.userId.name,
+            email: populatedDoctor.userId.email,
+            phone: populatedDoctor.userId.phone,
+            role: populatedDoctor.userId.role
+          } : null,
+          department: populatedDoctor.deptId ? {
+            id: populatedDoctor.deptId._id,
+            name: populatedDoctor.deptId.name
+          } : null
+        },
+        patient: patient ? {
+          id: patient._id,
+          name: patient.name,
+          email: patient.email,
+          phone: patient.phone,
+          role: patient.role
+        } : null
+      });
+    }
+
+    return res.status(200).json({ success: true, data: results });
   } catch (error) {
     return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: error.message } });
   }
