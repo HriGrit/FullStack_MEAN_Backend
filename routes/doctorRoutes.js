@@ -10,7 +10,8 @@ const router = express.Router();
 router.get('/available', authenticateJWT, authorizeRoles('PATIENT', 'ADMIN', 'DOCTOR'), getAvailableDoctors);
 
 // GET /api/v1/doctors/:id
-router.get('/:id', authenticateJWT, authorizeRoles('PATIENT', 'ADMIN', 'DOCTOR'), getDoctorById);
+// TODO: Migraded from :id to find/:id
+router.get('/find/:id', authenticateJWT, authorizeRoles('PATIENT', 'ADMIN', 'DOCTOR'), getDoctorById);
 
 // GET /api/v1/doctors (filter by deptId and/or specialization)
 router.get('/', authenticateJWT, authorizeRoles('PATIENT', 'ADMIN', 'DOCTOR'), filterDoctors);
