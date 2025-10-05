@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get('/departments',authenticateJWT,authorizeRoles('PATIENT','DOCTOR','ADMIN'),getAllDepartments);
 router.get('/', authenticateJWT, authorizeRoles('DOCTOR','ADMIN'), getAllPatients);
-router.get('/:id', authenticateJWT, authorizeRoles('DOCTOR','ADMIN'), getPatientById);
+router.get('/find/:id', authenticateJWT, authorizeRoles('DOCTOR','ADMIN'), getPatientById);
 router.get('/appointment', authenticateJWT, authorizeRoles('PATIENT'), getPatientAppointments);
 
 export default router;
