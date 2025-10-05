@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { Department } from "../models/departmentModel.js"
 import { DoctorModel } from "../models/doctorModel.js";
 import { User } from "../models/userModel.js";
+import { AppointmentModel } from "../models/appointmentModel.js";
+import { PrescriptionModel } from "../models/prescriptionModel.js";
 import { hashPassword,comparePasswords } from "../services/hashServices.js";
 // For Department Management
 
@@ -254,5 +256,130 @@ export const deleteDoctor = async (req, res) => {
     return res.status(200).json({ success: true, message: 'Doctor and associated user deleted successfully' });
   } catch (error) {
     return res.status(500).json({ success: false, error: { code: 'SERVER_ERROR', message: 'Something went wrong' } });
+  }
+};
+
+// Analytics Dashboard Endpoint
+export const getAnalytics = async (req, res) => {
+  try {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+
+    // Get today's date for filtering
+    const startOfToday = new Date(today + 'T00:00:00.000Z');
+    const endOfToday = new Date(today + 'T23:59:59.999Z');
+
+    // Execute all aggregation queries in parallel for better performance
+    const [
+      totalPatientsResult,
+      todaysAppointmentsResult,
+      pendingReviewsResult,
+      completedTodayResult
+    ] = await Promise.all([
+      // 1. Total Patients Count
+      User.aggregate([
+        {
+          $match: { role: 'PATIENT' }
+        },
+        {
+          $count: 'totalPatients'
+        }
+      ]),
+
+      // 2. Today's Appointments Count
+      AppointmentModel.aggregate([
+        {
+          $match: {
+            date: today,
+            status: 'BOOKED'
+          }
+        },
+        {
+          $count: 'todaysAppointments'
+        }
+      ]),
+
+      // 3. Pending Reviews Count (appointments without prescriptions)
+      AppointmentModel.aggregate([
+        {
+          $match: {
+            status: 'BOOKED',
+            date: { $lte: today } // Include past and today's appointments
+          }
+        },
+        {
+          $lookup: {
+            from: 'prescriptions',
+            localField: '_id',
+            foreignField: 'appointmentId',
+            as: 'prescription'
+          }
+        },
+        {
+          $match: {
+            prescription: { $size: 0 } // No prescription exists
+          }
+        },
+        {
+          $count: 'pendingReviews'
+        }
+      ]),
+
+      // 4. Completed Today Count (appointments with prescriptions created today)
+      AppointmentModel.aggregate([
+        {
+          $match: {
+            date: today,
+            status: 'BOOKED'
+          }
+        },
+        {
+          $lookup: {
+            from: 'prescriptions',
+            localField: '_id',
+            foreignField: 'appointmentId',
+            as: 'prescription'
+          }
+        },
+        {
+          $match: {
+            prescription: { $size: 1 }, // Has prescription
+            'prescription.createdAt': {
+              $gte: startOfToday,
+              $lte: endOfToday
+            }
+          }
+        },
+        {
+          $count: 'completedToday'
+        }
+      ])
+    ]);
+
+    // Extract counts from aggregation results
+    const totalPatients = totalPatientsResult[0]?.totalPatients || 0;
+    const todaysAppointments = todaysAppointmentsResult[0]?.todaysAppointments || 0;
+    const pendingReviews = pendingReviewsResult[0]?.pendingReviews || 0;
+    const completedToday = completedTodayResult[0]?.completedToday || 0;
+
+    return res.status(200).json({
+      success: true,
+      message: 'Analytics data retrieved successfully',
+      data: {
+        totalPatients,
+        todaysAppointments,
+        pendingReviews,
+        completedToday
+      }
+    });
+
+  } catch (error) {
+    console.error('Analytics error:', error);
+    return res.status(500).json({
+      success: false,
+      error: {
+        code: 'SERVER_ERROR',
+        message: 'Failed to retrieve analytics data'
+      }
+    });
   }
 };
